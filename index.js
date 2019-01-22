@@ -4,6 +4,7 @@ var util = require("util");
 var fs = require('fs');
 var mongoose= require('./server/db/mongoose.js');
 var {location}= require('./server/models/trafficdensity.js');
+var {driver}= require('./server/models/ambulance_drivers.js');
 var bodyParser= require('body-parser')
 var spawn = require("child_process").spawn;
 var process = spawn('python',["imagedetection.py"]);
@@ -25,7 +26,8 @@ app.post('/',(req,res)=>{
 
 //route to get the traffic data of the particular place by giving the place code
 app.get('/trafficdata',(req,res)=>{
-    location.find({place_code:req.body.place_code},(err,doc)=>{
+    location.find({place_code:req.query.place_code},(err,doc)=>{
+
         res.send(doc);
     });
     });
@@ -35,6 +37,25 @@ app.get('/home',(req,res)=>{
 
             res.send("hey");
         });
+//for ambulance related routes//-----------------------------------------
+
+//for creating a new driver account
+app.post('/dri_create',(req,res)=>{
+    data=new driver({name:req.body.name,ambulance_no:req.body.ambulance_no});
+    data.save().then((data)=>{
+        res.send('new driver added to ambulance list');
+    });
+});
+
+//for getting the status of the ambulance (includes the request for the
+//particular traffic light of particualar place code.)
+app.get('/post_request',(req,res)=>{
+    driver.findOneAndUpdate({ambulance_no:req.body.ambulance_no},{place_code:req.body.place_code,status:req.body.status},(err,data)=>{
+        res.send('successfully request submitted');
+        //arduino interrupt code to signal the lane based on the place_code
+        //location.
+    });
+});
 
 
 
