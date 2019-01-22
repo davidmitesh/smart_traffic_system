@@ -1,0 +1,24 @@
+{
+  "name": "traffic_system",
+  "version": "1.0.0",
+  "description": "a smart traffic based system",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "smart",
+    "traffic",
+    "computervision"
+  ],
+  "author": "mitesh pandey",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "lodash": "^4.17.11",
+    "mongoose": "^5.4.5",
+    "nodemon": "^1.18.9",
+    "python-shell": "^1.0.7"
+  }
+}
