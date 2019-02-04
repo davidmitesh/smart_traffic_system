@@ -22,28 +22,21 @@ byte colPins[COLS] = {A2, A3, A4}; //connect to the column pinouts of the keypad
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance.
+byte deduction;
 
 MFRC522::MIFARE_Key key;
 void setup() {
-  
-   Serial.begin(9600); // Initialize serial communications with the PC
-    while (!Serial);    // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
-    SPI.begin();        // Init SPI bus
-    mfrc522.PCD_Init(); // Init MFRC522 card
-    lcd.begin(16,2);
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+  while(!Serial);
+  SPI.begin();
+  mfrc522.PCD_Init();
+  lcd.begin(16,2);
 
-    // Prepare the key (used both as key A and as key B)
-    // using FFFFFFFFFFFFh which is the default at chip delivery from the factory
-    for (byte i = 0; i < 6; i++) {
-        key.keyByte[i] = 0xFF;
+  for (byte i=0;i<6;i++){
+      key.keyByte[i] = 0xFF;
     }
-
-    Serial.println(F("Scan a MIFARE Classic PICC to demonstrate read and write."));
-    Serial.print(F("Using key (for A and B):"));
-    dump_byte_array(key.keyByte, MFRC522::MF_KEY_SIZE);
-    Serial.println();
-
-    Serial.println(F("BEWARE: Data will be written to the PICC, in sector #1"));
+  
      finger.begin(57600);
   
   if (finger.verifyPassword()) {
@@ -52,264 +45,318 @@ void setup() {
     Serial.println("Did not find fingerprint sensor :(");
     while (1) { delay(1); }
   }
-
-    
-
+  Serial.println("Choose Mode");
+  lcd.setCursor(0,0);
+  lcd.print("A: Payment Mode");
+  Serial.println("A: Payment Mode");
+  lcd.setCursor(0,1);
+  lcd.print("B: Recharge Mode");
+  Serial.println("B: Recharge Mode");
+  //dump_byte_array(key.keyByte,MFRC522::MF_KEY_SIZE);
+  Serial.println();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  char key = keypad.getKey();
-  
-  if (key){
-    Serial.println(key);
-    
-    if (key == 'A' ){
-      lcd.clear();
-      lcd.print("Payment Mode");
-       if ( ! mfrc522.PICC_IsNewCardPresent())
-        return;
+  char button = keypad.getKey();
 
-    // Select one of the cards
-    if ( ! mfrc522.PICC_ReadCardSerial())
-        return;
-
-    // Show some details of the PICC (that is: the tag/card)
-    Serial.print(F("Card UID:"));
-    dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
-    Serial.println();
-    Serial.print(F("PICC type: "));
-    MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
-    Serial.println(mfrc522.PICC_GetTypeName(piccType));
-
-  if (    piccType != MFRC522::PICC_TYPE_MIFARE_MINI
-        &&  piccType != MFRC522::PICC_TYPE_MIFARE_1K
-        &&  piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
-        Serial.println(F("This sample only works with MIFARE Classic cards."));
-        return;
-    }
-    //-------------------------Payment---------------------------------------------------
-     MFRC522::StatusCode status;
-    byte buffer[18];
-    byte size = sizeof(buffer);
-    byte identityBlock = 15;
-    byte identitySector = 3;
-    byte identityBlockAddr = 12;
-    
-
-    // Authenticate using key A
-    Serial.println(F("Authenticating using key A..."));
-    status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, identityBlock, &key, &(mfrc522.uid));
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("PCD_Authenticate() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-        return;
-    }
-    
- // Authenticate using key B
-    Serial.println(F("Authenticating again using key B..."));
-    status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_B, identityBlock, &key, &(mfrc522.uid));
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("PCD_Authenticate() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-        return;
-    }
-    Serial.println(F("Current data in sector:"));
-    mfrc522.PICC_DumpMifareClassicSectorToSerial(&(mfrc522.uid), &key, identitySector);
-    Serial.println();
-
-    Serial.print(F("Reading data from block ")); Serial.print(identityBlockAddr);
-    Serial.println(F(" ..."));
-    status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(identityBlockAddr, buffer, &size);
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("MIFARE_Read() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-    }
-    Serial.print(F("Data in block ")); Serial.print(identityBlockAddr); Serial.println(F(":"));
-    dump_byte_array(buffer, 16); Serial.println(buffer[0]);
-
-    byte tempo = buffer[0];
-    if(tempo == 1){
-      Serial.println("For Student: ");
-      lcd.clear();
-      lcd.print("Student Card");
-      //-------------------Fingerprint--Begin------------------
+  if (button){
       
-        while (!  getFingerprintEnroll() );
-
-
-uint8_t getFingerprintEnroll() {
-
-  int p = -1;
-  Serial.print("Waiting for valid finger to enroll as #"); Serial.println(id);
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("Waitinf For");
-  lcd.setCursor(0,1);
-  lcd.print("Fingerprint...");
-  while (p != FINGERPRINT_OK) {
-    p = finger.getImage();
-    switch (p) {
-    case FINGERPRINT_OK:
-      Serial.println("Image taken");
-      break;
-    case FINGERPRINT_NOFINGER:
-      Serial.println(".");
-      break;
-    case FINGERPRINT_PACKETRECIEVEERR:
-      Serial.println("Communication error");
-      break;
-    case FINGERPRINT_IMAGEFAIL:
-      Serial.println("Imaging error");
-      break;
-    default:
-      Serial.println("Unknown error");
-      break;
-    }
-  }
-}
-
-      
-      //-------------------Fingerprint--End---------------------
-
-      //------------------------Deduction-Start-----------------------
-      byte sector2        = 2;
-      byte blockAddr2     = 8;
-      byte AuthBlock      = 11; 
-      byte dataBlocks3[16];
-      
-      Serial.print(F("Reading data from block ")); Serial.print(blockAddr2);
-    Serial.println(F(" ..."));
-    status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(blockAddr2, buffer, &size);
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("MIFARE_Read() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-    }
-    Serial.print(F("Data in block ")); Serial.print(blockAddr2); Serial.println(F(":"));
-    dump_byte_array(buffer, 16); Serial.println();
-    lcd.clear();
-    
-    Serial.println(buffer[0]);
-    byte temp = buffer[0];
-    
-    int deduction = 10;
-    if(buffer[0]< deduction){Serial.println("Insufficient Balance");
-    lcd.setCursor(0,0);
-    lcd.print("Insufficient");
-    lcd.setCursor(0,1);
-    lcd.print("Balance");
-    }else{
-    temp -= deduction; 
-     lcd.setCursor(0,0);
-    lcd.print("Balance- ");
-    lcd.print(temp);
-    lcd.setCursor(0,1);
-    lcd.print("Deducted- ");
-    lcd.print(deduction);
-    dataBlocks3[0] = temp;
-     Serial.print(F("Writing data into block ")); Serial.print(blockAddr2);
-    Serial.println(F(" ..."));
-    dump_byte_array(dataBlocks3, 16); Serial.println();
-    
-    status = (MFRC522::StatusCode) mfrc522.MIFARE_Write(blockAddr2, dataBlocks3, 16);
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("MIFARE_Write() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-    }
-    Serial.println();
-    }
-
-    Serial.println(F("Current data in sector:"));
-    mfrc522.PICC_DumpMifareClassicSectorToSerial(&(mfrc522.uid), &key, sector2);
-    Serial.println();
-    
-    delay(3000);
-    lcd.clear();
-      //------------------------Deduction-Stop------------------------
-       // Halt PICC
-    mfrc522.PICC_HaltA();
-    // Stop encryption on PCD
-    mfrc522.PCD_StopCrypto1();
-      
-      }else{
-        Serial.println("For General Public: ");
+      if(button == 'A'){
         lcd.clear();
-        lcd.print("General Card");
-        //-------------------Deduction-For-General-Public--------------------
-        byte blockAddr2     = 8;
-         Serial.print(F("Reading data from block ")); Serial.print(blockAddr2);
-    Serial.println(F(" ..."));
-    status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(blockAddr2, buffer, &size);
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("MIFARE_Read() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-    }
-    Serial.print(F("Data in block ")); Serial.print(blockAddr2); Serial.println(F(":"));
-    dump_byte_array(buffer, 16); Serial.println();
-    
-    Serial.println(buffer[0]);
-    byte temp = buffer[0];
-    
-    int deduction = 25;
-    if(buffer[0]< deduction){Serial.println("Insufficient Balance");
-    lcd.setCursor(0,0);
-    lcd.print("Insufficient");
-    lcd.setCursor(0,1);
-    lcd.print("Balance");
-    }else{
-    temp -= deduction; 
-     lcd.setCursor(0,0);
-    lcd.print("Balance- ");
-    lcd.print(temp);
-    lcd.setCursor(0,1);
-    lcd.print("Deducted- ");
-    lcd.print(deduction);
-    dataBlocks3[0] = temp;
-    check = 1;
-     Serial.print(F("Writing data into block ")); Serial.print(blockAddr2);
-    Serial.println(F(" ..."));
-    dump_byte_array(dataBlocks3, 16); Serial.println();
-    
-    status = (MFRC522::StatusCode) mfrc522.MIFARE_Write(blockAddr2, dataBlocks3, 16);
-    if (status != MFRC522::STATUS_OK) {
-        Serial.print(F("MIFARE_Write() failed: "));
-        Serial.println(mfrc522.GetStatusCodeName(status));
-    }
-    Serial.println();
-    }
+        lcd.print("Payment Mode");
+        Serial.println("Chosen Payment Mode");
+        delay(1500);
+        lcd.clear();
+        lcd.print("Scan the card");
+        Serial.println("Waiting for card...");
+        //delay(1000);
+       //if ( ! mfrc522.PICC_IsNewCardPresent())
+         // return;
+          while (!mfrc522.PICC_IsNewCardPresent());
+          //Serial.println("Card is read");
+  
+      // Select one of the cards
+      if ( ! mfrc522.PICC_ReadCardSerial())
+          return;
 
-    Serial.println(F("Current data in sector:"));
-    mfrc522.PICC_DumpMifareClassicSectorToSerial(&(mfrc522.uid), &key, sector2);
-    Serial.println();
-    
-    delay(5000);
-    lcd.clear();
-    //-----------------------------------------------
-    // Halt PICC
-    mfrc522.PICC_HaltA();
-    // Stop encryption on PCD
-    mfrc522.PCD_StopCrypto1();
-        //-------------------End-of-Deduction-For-General-Public-------------
-        }
-    
-    
-
-    
-    
-    //---------------------------------------------------------------------------
-      
-      
+       
+  
+      // Show some details of the PICC (that is: the tag/card)
+     // Serial.print(F("Card UID:"));
+      //dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
+      Serial.println();
+     // Serial.print(F("PICC type: "));
+      MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
+     // Serial.println(mfrc522.PICC_GetTypeName(piccType));
+  
+    if (    piccType != MFRC522::PICC_TYPE_MIFARE_MINI
+          &&  piccType != MFRC522::PICC_TYPE_MIFARE_1K
+          &&  piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+          Serial.println(F("This sample only works with MIFARE Classic cards."));
+          return;
       }
-      else if (key == 'B'){
-        lcd.clear();
-       lcd.print("Recharge Mode");
+        
+        //---------------Scan General vs Student Card--------------
+        MFRC522::StatusCode status;
+        byte buffer[18];
+        byte size = sizeof(buffer);
+        int AuthAddr = 15;
+        int BlockAddr = 12;
+        int CheckSector = 3;
+         // Authenticate using key A
+        status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A,AuthAddr , &key, &(mfrc522.uid));
+        if (status != MFRC522::STATUS_OK) {
+            Serial.print(F("PCD_Authenticate() failed: "));
+            Serial.println(mfrc522.GetStatusCodeName(status));
+            return;
         }
-  }
+       // Authenticate using key B
+        status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_B, AuthAddr, &key, &(mfrc522.uid));
+        if (status != MFRC522::STATUS_OK) {
+            Serial.print(F("PCD_Authenticate() failed: "));
+            Serial.println(mfrc522.GetStatusCodeName(status));
+            return;
+        }
 
+        // Read Student or Gen Public
+         status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(BlockAddr, buffer, &size);
+        if (status != MFRC522::STATUS_OK) {
+            Serial.print(F("MIFARE_Read() failed: "));
+            Serial.println(mfrc522.GetStatusCodeName(status));
+        }
+        if(buffer[0] == 1){
+          lcd.clear();
+          lcd.print("Student Card");
+          Serial.println("Student Card");
+          delay(1500);
+          //-----------------Fingerprint Begin---------------------
+          lcd.clear();
+          lcd.print("Scan Fingerprint");
+          Serial.print("Waiting for fingerprint...");
+          Serial.println();
+          
+          
+            while(! getFingerprint());
+          
+          //-----------------Fingerprint End-----------------------
+          delay(1500);
+          lcd.clear();
+          lcd.print("Student Number");
+          char NumberofStudents;
+          while(! (NumberofStudents = keypad.getKey()));
+          
+          Serial.println(NumberofStudents);
+          if(NumberofStudents == '2' || NumberofStudents == '3' || NumberofStudents == '5' || NumberofStudents == '6'){
+          deduction = 10*(NumberofStudents-48);
+          lcd.clear();
+          lcd.setCursor(0,0);
+          lcd.print("Students: ");
+          lcd.print(NumberofStudents);
+          Serial.print("Students: ");
+          Serial.println(NumberofStudents);
+          lcd.setCursor(0,1);
+          lcd.print("Deduction: ");
+          lcd.print(deduction);
+          Serial.print("Deduction: ");
+          Serial.println(deduction);
+          }
+          else{
+          lcd.clear();
+          lcd.print("Invalid Input");
+          Serial.println("Invalid Input");
+          }
+          
+          
+          
+          }else{
+            lcd.clear();
+            lcd.print("General Card");
+            Serial.println("General Card");
+            delay(1000);
+            lcd.clear();
+            lcd.print("People: ");
+            char NumberofPeople;
+            while(! (NumberofPeople = keypad.getKey()));
+            
+            Serial.println(NumberofPeople);
+            if(NumberofPeople == '2' || NumberofPeople == '3' || NumberofPeople == '5' || NumberofPeople == '6'){
+            deduction = 20*(NumberofPeople-48);
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("People: ");
+            lcd.print(NumberofPeople);
+            Serial.print("People: ");
+            Serial.println(NumberofPeople);
+            lcd.setCursor(0,1);
+            lcd.print("Deduction: ");
+            lcd.print(deduction);
+            Serial.print("Deduction: ");
+            Serial.println(deduction);
+            }
+            else{
+            lcd.clear();
+            lcd.print("Invalid Input");
+            Serial.println("Invalid Input");
+            }
+            
+            }
+        //---------------Scan General Vs Student Card End----------
+
+        //---------------Deduction Start---------------------------
+        byte MoneyBlockAddr = 8;
+        byte MoneySector = 2;
+        byte MoneyAuthAddr = 11;
+        byte MoneyBlock[16]={0};
+
+        status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, MoneyAuthAddr, &key, &(mfrc522.uid));
+        if (status != MFRC522::STATUS_OK) {
+            Serial.print(F("PCD_Authenticate() failed: "));
+            Serial.println(mfrc522.GetStatusCodeName(status));
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Error Reading");
+            lcd.setCursor(0,1);
+            lcd.print("Card. Try again");
+            return;
+        }
+        
+     
+        status = (MFRC522::StatusCode) mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_B, MoneyAuthAddr, &key, &(mfrc522.uid));
+        if (status != MFRC522::STATUS_OK) {
+            Serial.print(F("PCD_Authenticate() failed: "));
+            Serial.println(mfrc522.GetStatusCodeName(status));
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Error Reading");
+            lcd.setCursor(0,1);
+            lcd.print("Card. Try again");
+            return;
+        }
+        
+        status = (MFRC522::StatusCode) mfrc522.MIFARE_Read(MoneyBlockAddr, buffer, &size);
+        if (status != MFRC522::STATUS_OK) {
+            Serial.print(F("MIFARE_Read() failed: "));
+            Serial.println(mfrc522.GetStatusCodeName(status));
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Error Reading");
+            lcd.setCursor(0,1);
+            lcd.print("Card. Try again");
+        }
+        if(buffer[0] >=deduction){
+        MoneyBlock[0] = buffer[0]-deduction;
+        status = (MFRC522::StatusCode) mfrc522.MIFARE_Write(MoneyBlockAddr, MoneyBlock, 16);
+        if (status != MFRC522::STATUS_OK) {
+            Serial.print(F("MIFARE_Write() failed: "));
+            Serial.println(mfrc522.GetStatusCodeName(status));
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Error Reading");
+            lcd.setCursor(0,1);
+            lcd.print("Card. Try again");
+        }else{
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Deduced: ");
+            lcd.print(deduction);
+            Serial.print("Deduced: ");
+            Serial.println(deduction);
+            lcd.setCursor(0,1);
+            lcd.print("Remaining: ");
+            lcd.print(buffer[0]-deduction);
+            Serial.print("Remaining: ");
+            Serial.println(buffer[0]-deduction);
+            
+          }
+          }else{
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Insufficient");
+            lcd.setCursor(0,1);
+            lcd.print("Money");
+            Serial.print("Insufficient Money");
+            Serial.println();
+            }
+        
+        
+        
+        //---------------Deduction End-----------------------------
+        // Halt PICC
+            mfrc522.PICC_HaltA();
+            // Stop encryption on PCD
+            mfrc522.PCD_StopCrypto1();
+
+        
+        }else if(button == 'B'){
+          if ( ! mfrc522.PICC_IsNewCardPresent())
+          return;
   
+      // Select one of the cards
+      if ( ! mfrc522.PICC_ReadCardSerial())
+          return;
+  
+      // Show some details of the PICC (that is: the tag/card)
+      Serial.print(F("Card UID:"));
+      //dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
+      Serial.println();
+     // Serial.print(F("PICC type: "));
+      MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
+     // Serial.println(mfrc522.PICC_GetTypeName(piccType));
+  
+    if (    piccType != MFRC522::PICC_TYPE_MIFARE_MINI
+          &&  piccType != MFRC522::PICC_TYPE_MIFARE_1K
+          &&  piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+          Serial.println(F("This sample only works with MIFARE Classic cards."));
+          return;
+      }
+          lcd.clear();
+        lcd.print("Recharge Mode");
+          } 
+    }
 
 }
- void dump_byte_array(byte *buffer, byte bufferSize) {
+uint8_t getFingerprint(){
+            int p = -1;
+            while(p != FINGERPRINT_OK){
+              p = finger.getImage();
+              switch(p){
+                  case FINGERPRINT_OK:
+                  Serial.println("Image Taken");
+                  lcd.clear();
+                  lcd.setCursor(0,0);
+                  lcd.print("Fingerprint");
+                  lcd.setCursor(0,1);
+                  lcd.print("Scanned");
+                  delay(1000);
+                  return 1;
+                  break;
+                  case FINGERPRINT_IMAGEFAIL:
+                  case FINGERPRINT_PACKETRECIEVEERR:
+                  Serial.println("Error scanning fingerprint");
+                  lcd.clear();
+                  lcd.setCursor(0,0);
+                  lcd.print("Scan Error");
+                  lcd.setCursor(0,1);
+                  lcd.print("Try again");
+                  break;
+                  case FINGERPRINT_NOFINGER:
+                  Serial.println(".");
+                  lcd.clear();
+                  lcd.setCursor(0,0);
+                  lcd.print("Place your thumb");
+                  lcd.setCursor(0,1);
+                  lcd.print("on scanner");
+                  break;
+                  default:
+                  Serial.println("Unknown Error");
+                  lcd.clear();
+                  lcd.print("Unknown Error");
+                  
+                }
+              }
+            }
+void dump_byte_array(byte *buffer, byte bufferSize) {
     for (byte i = 0; i < bufferSize; i++) {
         Serial.print(buffer[i] < 0x10 ? " 0" : " ");
         Serial.print(buffer[i], HEX);
