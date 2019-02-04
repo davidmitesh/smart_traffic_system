@@ -423,11 +423,13 @@ void loop() {
           lcd.clear();
           lcd.print("Return: ");
           lcd.print(buffer[0]);
-          
+          Serial.print("Recharged: ");
+          Serial.println(250-buffer[0]);
           Serial.print("Current Balance: ");
           Serial.println(MoneyBlock[0]);
           Serial.print("Return: ");
           Serial.println(buffer[0]);
+          delay(1500);
           
             }
           //----------------------Update Balance End-----------------------
