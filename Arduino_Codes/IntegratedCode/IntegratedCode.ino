@@ -8,7 +8,7 @@
 #define SS_PIN          10  
 SoftwareSerial mySerial(2, 3);
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
-const int rs = 5, en = 4, d4 = 6, d5 = 7, d6 = A5, d7 = 8;
+const int rs = 4, en = 5, d4 = 6, d5 = 7, d6 = 8, d7 = A5;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);// Configurable, see typical pin layout above
 const byte ROWS = 2; //four rows
 const byte COLS = 3; //three columns
